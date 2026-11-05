@@ -1,18 +1,21 @@
 #include "jf.h"
 #include "util.h"
 
+#include "json.h"
+
 #include <curl/curl.h>
-#include <jansson.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 /* libcurl was built with zstd support; we never use it, so provide empty stand-ins
    instead of linking the real library. */
 void *ZSTD_createDStream(void) { return 0; }
 size_t ZSTD_freeDStream(void *s) { (void)s; return 0; }
 size_t ZSTD_decompressStream(void *s, void *o, void *i) { (void)s; (void)o; (void)i; return (size_t)-1; }
 unsigned ZSTD_isError(size_t c) { return c > (size_t)-120; }
+
 static char server[256], token[160], uid[64], cfg_user[96], cfg_pass[96];
 
 struct mem {
@@ -65,15 +68,15 @@ static int64_t jint(json_t *o, const char *k) {
 }
 
 static void save_auth(void) {
-  json_t *o = json_pack("{s:s,s:s}", "token", token, "user_id", uid);
-  char *s = json_dumps(o, JSON_INDENT(2));
+  char t[400], u[200], buf[700];
+  json_escape(token, t, sizeof t);
+  json_escape(uid, u, sizeof u);
+  snprintf(buf, sizeof buf, "{\"token\":\"%s\",\"user_id\":\"%s\"}\n", t, u);
   FILE *f = fopen(DATA_DIR "/auth.json", "wb");
-  if (f && s) {
-    fputs(s, f);
+  if (f) {
+    fputs(buf, f);
     fclose(f);
   }
-  free(s);
-  json_decref(o);
 }
 
 int jf_init(void) {
@@ -243,12 +246,12 @@ static int take_auth(json_t *r) {
 }
 
 int jf_login_password(void) {
-  json_t *b = json_pack("{s:s,s:s}", "Username", cfg_user, "Pw", cfg_pass);
-  char *s = json_dumps(b, 0);
-  json_decref(b);
+  char u[400], p[400], body[900];
+  json_escape(cfg_user, u, sizeof u);
+  json_escape(cfg_pass, p, sizeof p);
+  snprintf(body, sizeof body, "{\"Username\":\"%s\",\"Pw\":\"%s\"}", u, p);
   token[0] = 0;
-  json_t *r = api("POST", "/Users/AuthenticateByName", s);
-  free(s);
+  json_t *r = api("POST", "/Users/AuthenticateByName", body);
   return take_auth(r);
 }
 
@@ -270,11 +273,10 @@ int jf_quick_poll(const char *secret) {
   int ok = json_is_true(json_object_get(r, "Authenticated"));
   json_decref(r);
   if (!ok) return 0;
-  json_t *b = json_pack("{s:s}", "Secret", secret);
-  char *s = json_dumps(b, 0);
-  json_decref(b);
-  r = api("POST", "/Users/AuthenticateWithQuickConnect", s);
-  free(s);
+  char sec[300], body[400];
+  json_escape(secret, sec, sizeof sec);
+  snprintf(body, sizeof body, "{\"Secret\":\"%s\"}", sec);
+  r = api("POST", "/Users/AuthenticateWithQuickConnect", body);
   return take_auth(r) == 0;
 }
 
@@ -415,12 +417,13 @@ void jf_report(const char *id, const char *source_id, int64_t pos, int state, in
   const char *path = state == 0   ? "/Sessions/Playing"
                      : state == 1 ? "/Sessions/Playing/Progress"
                                   : "/Sessions/Playing/Stopped";
-  json_t *b = json_pack("{s:s,s:s,s:I,s:b}", "ItemId", id, "MediaSourceId", source_id,
-                        "PositionTicks", (json_int_t)pos, "IsPaused", paused);
-  char *s = json_dumps(b, 0);
-  json_decref(b);
+  char a[200], b[200], body[560];
+  json_escape(id, a, sizeof a);
+  json_escape(source_id, b, sizeof b);
+  snprintf(body, sizeof body,
+           "{\"ItemId\":\"%s\",\"MediaSourceId\":\"%s\",\"PositionTicks\":%lld,\"IsPaused\":%s}", a,
+           b, (long long)pos, paused ? "true" : "false");
   struct mem m = {0};
-  request("POST", path, s, &m);
+  request("POST", path, body, &m);
   free(m.p);
-  free(s);
 }
