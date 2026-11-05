@@ -7,7 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+/* libcurl was built with zstd support; we never use it, so provide empty stand-ins
+   instead of linking the real library. */
+void *ZSTD_createDStream(void) { return 0; }
+size_t ZSTD_freeDStream(void *s) { (void)s; return 0; }
+size_t ZSTD_decompressStream(void *s, void *o, void *i) { (void)s; (void)o; (void)i; return (size_t)-1; }
+unsigned ZSTD_isError(size_t c) { return c > (size_t)-120; }
 static char server[256], token[160], uid[64], cfg_user[96], cfg_pass[96];
 
 struct mem {
@@ -133,7 +138,7 @@ static long request(const char *method, const char *path, const char *body, stru
   curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
   curl_easy_setopt(c, CURLOPT_SSL_VERIFYHOST, 0L);
   curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "");
+  curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "gzip");
   if (body) curl_easy_setopt(c, CURLOPT_POSTFIELDS, body);
 
   long code = 0;
