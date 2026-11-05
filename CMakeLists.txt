@@ -27,7 +27,7 @@ add_executable(${PROJECT_NAME}.elf
 
 target_link_libraries(${PROJECT_NAME}.elf
   vita2d
-  curl ssl crypto zstd z
+  curl ssl crypto z
   jansson
   freetype png jpeg z m
   pthread
