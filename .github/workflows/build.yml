@@ -14,6 +14,18 @@ jobs:
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j
+      - name: Diagnose
+        if: failure()
+        run: |
+          echo "--- our own files ---"
+          for f in build/CMakeFiles/VitaFin.elf.dir/src/*.obj; do
+            echo "$f: $(arm-vita-eabi-readelf -r $f | grep -c BASE_PREL)"
+          done
+          echo "--- libraries ---"
+          cd $VITASDK/arm-vita-eabi/lib
+          for a in libcurl.a libssl.a libcrypto.a libjansson.a libvita2d.a libfreetype.a libpng.a libjpeg.a libz.a libpthread.a; do
+            echo "$a: $(arm-vita-eabi-readelf -r $a 2>/dev/null | grep -c BASE_PREL)"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: VitaFin
