@@ -23,12 +23,12 @@ add_executable(${PROJECT_NAME}.elf
   src/img.c
   src/player.c
   src/ui.c
+  src/json.c
 )
 
 target_link_libraries(${PROJECT_NAME}.elf
   vita2d
   curl ssl crypto z
-  jansson
   freetype png jpeg z m
   pthread
   SceDisplay_stub SceGxm_stub SceSysmodule_stub SceCtrl_stub SceTouch_stub
